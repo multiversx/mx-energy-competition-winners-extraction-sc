@@ -48,7 +48,12 @@ extractWinners() {
 
 distributeRewards() {
     mxpy --verbose contract call ${ADDRESS} --recall-nonce --pem=${ALICE} --gas-limit=300000000 \
-    --function="distributeRewards" --value 2663000000000000000 --send --proxy=${PROXY} --chain=${CHAIN_ID}     
+    --function="distributeRewards" --value 5000 --arguments 500 --send --proxy=${PROXY} --chain=${CHAIN_ID}     
+}
+
+upgrade() {
+    erdpy --verbose contract upgrade ${ADDRESS} --project=${PROJECT} --recall-nonce --pem=${ALICE} \
+    --gas-limit=25000000 --send --outfile="upgrade.json" --proxy=${PROXY} --chain=${CHAIN_ID} || return
 }
 
 appendBech32() {

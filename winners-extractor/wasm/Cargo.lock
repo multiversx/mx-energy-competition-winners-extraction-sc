@@ -133,6 +133,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "multiversx-sc-modules"
+version = "0.39.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2e9bbd212d54741af3edab8bbfb3ca7724bdd1b411e598a0a7f07d0478a7a815"
+dependencies = [
+ "multiversx-sc",
+]
+
+[[package]]
 name = "multiversx-sc-wasm-adapter"
 version = "0.39.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -262,6 +271,7 @@ name = "winners-extractor"
 version = "0.0.0"
 dependencies = [
  "multiversx-sc",
+ "multiversx-sc-modules",
 ]
 
 [[package]]
