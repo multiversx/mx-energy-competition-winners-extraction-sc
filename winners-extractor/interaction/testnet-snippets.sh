@@ -1,18 +1,19 @@
 
 ALICE="~/alice.pem"
-PROXY=https://testnet-gateway.multiversx.com
-CHAIN_ID=T
-ADDRESS=$(mxpy data load --key=address-testnet)
+ALICE_ADDRESS="erd1qyu5wthldzr8wx5c9ucg8kjagg0jfs53s8nr3zpz3hypefsdd8ssycr6th"
+PROXY=https://devnet-gateway.multiversx.com
+CHAIN_ID=D
+ADDRESS=$(mxpy data load --key=address-devnet)
 
 deploy() {
     mxpy --verbose contract deploy --project=${PROJECT} --recall-nonce --pem=${ALICE} --gas-limit=50000000 \
-    --send --outfile="deploy-testnet.interaction.json" --proxy=${PROXY} --chain=${CHAIN_ID} || return
+    --send --outfile="deploy-devnet.interaction.json" --proxy=${PROXY} --chain=${CHAIN_ID} || return
 
-    TRANSACTION=$(mxpy data parse --file="deploy-testnet.interaction.json" --expression="data['emittedTransactionHash']")
-    ADDRESS=$(mxpy data parse --file="deploy-testnet.interaction.json" --expression="data['contractAddress']")
+    TRANSACTION=$(mxpy data parse --file="deploy-devnet.interaction.json" --expression="data['emittedTransactionHash']")
+    ADDRESS=$(mxpy data parse --file="deploy-devnet.interaction.json" --expression="data['contractAddress']")
 
-    mxpy data store --key=address-testnet --value=${ADDRESS}
-    mxpy data store --key=deployTransaction-testnet --value=${TRANSACTION}
+    mxpy data store --key=address-devnet --value=${ADDRESS}
+    mxpy data store --key=deployTransaction-devnet --value=${TRANSACTION}
 
     echo ""
     echo "Smart contract address: ${ADDRESS}"
@@ -55,6 +56,16 @@ depositRewards() {
 distributeRewards() {
     mxpy --verbose contract call ${ADDRESS} --recall-nonce --pem=${ALICE} --gas-limit=300000000 \
     --function="distributeRewards" --send --proxy=${PROXY} --chain=${CHAIN_ID}     
+}
+
+IDENTIFIER=MEX-dc289c
+NONCE=0
+AMOUNT=292000
+depositMetaEsdtRewards() {
+    echo ${ADDRESS}
+    mxpy --verbose contract call ${ALICE_ADDRESS} --recall-nonce --pem=${ALICE} --gas-limit=300000000 \
+    --function="MultiESDTNFTTransfer" --arguments ${ADDRESS} 1 str:${IDENTIFIER} ${NONCE} ${AMOUNT} str:"depositRewards" \
+    --send --proxy=${PROXY} --chain=${CHAIN_ID}     
 }
 
 upgrade() {

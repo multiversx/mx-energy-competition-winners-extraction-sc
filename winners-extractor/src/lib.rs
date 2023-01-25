@@ -50,9 +50,9 @@ pub trait ExtractWinnersContract: multiversx_sc_modules::ongoing_operation::Ongo
         let payment = self.call_value().egld_or_single_esdt();
         let participants = self.participants();
         let num_participants = participants.len() as u32;
-        let per_user = payment.amount.clone() / num_participants;
+        let per_user = &payment.amount / num_participants;
         require!(per_user > 0u32, "Distribute amount cannot be zero");
-        require!(per_user.clone() * num_participants == payment.amount, "Invalid value sent");
+        require!(&per_user * num_participants == payment.amount, "Invalid value sent");
         self.pending_distribution().set(PendingDistribution {
             payment: payment.token_identifier,
             payment_nonce: payment.token_nonce,
@@ -95,6 +95,7 @@ pub trait ExtractWinnersContract: multiversx_sc_modules::ongoing_operation::Ongo
 
     #[endpoint(extractWinners)]
     fn extract_winners(&self, num_winners: u64) -> MultiValueEncoded<ManagedAddress> {
+        require!(self.pending_distribution().is_empty(), "A distribution is in progress");
         let mut rng = RandomnessSource::default();
         let mut participants = self.participants();
         let mut winners = MultiValueEncoded::new();
@@ -103,6 +104,9 @@ pub trait ExtractWinnersContract: multiversx_sc_modules::ongoing_operation::Ongo
             let winner = participants.get(winner_index);
             winners.push(winner.clone());
             participants.swap_remove(winner_index);
+        }
+        for winner in winners.to_vec().iter() {
+            let _ = participants.push(&winner);
         }
         winners
     }
