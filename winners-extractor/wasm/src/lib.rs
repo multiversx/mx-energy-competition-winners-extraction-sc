@@ -19,10 +19,10 @@ multiversx_sc_wasm_adapter::endpoints! {
     winners_extractor
     (
         addParticipantsAddresses
+        depositRewards
         distributeRewards
-        cancelDistribution
-        participantsLeft
         extractWinners
+        participantsLeft
         getPendingDistribution
         getParticipants
     )

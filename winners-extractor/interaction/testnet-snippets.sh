@@ -47,9 +47,14 @@ extractWinners() {
     --function="extractWinners" --arguments 50 --send --proxy=${PROXY} --chain=${CHAIN_ID}     
 }
 
+depositRewards() {
+    mxpy --verbose contract call ${ADDRESS} --recall-nonce --pem=${ALICE} --gas-limit=30000000 \
+    --function="depositRewards" --value 292000 --send --proxy=${PROXY} --chain=${CHAIN_ID}     
+}
+
 distributeRewards() {
     mxpy --verbose contract call ${ADDRESS} --recall-nonce --pem=${ALICE} --gas-limit=300000000 \
-    --function="distributeRewards" --value 4200 --arguments 420 --send --proxy=${PROXY} --chain=${CHAIN_ID}     
+    --function="distributeRewards" --send --proxy=${PROXY} --chain=${CHAIN_ID}     
 }
 
 upgrade() {
