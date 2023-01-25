@@ -21,6 +21,7 @@ use multiversx_sc_modules::ongoing_operation::{
 )]
 pub struct PendingDistribution<M: ManagedTypeApi> {
     pub payment: EgldOrEsdtTokenIdentifier<M>,
+    pub per_user: BigUint<M>,
     pub current_number: usize,
 }
 
@@ -32,59 +33,28 @@ pub trait ExtractWinnersContract: multiversx_sc_modules::ongoing_operation::Ongo
 
     #[only_owner]
     #[endpoint(addParticipantsAddresses)]
-    fn add_participants_addresses(&self, participants_addr: MultiValueEncoded<ManagedAddress>) {
+    fn add_participants_addresses(&self, participants_addr: MultiValueEncoded<ManagedAddress>) -> usize {
         let mut participants = self.participants();
         for addr in participants_addr {
             let _ = participants.push(&addr);
         }
+        participants.len()
     }
 
     #[only_owner]
     #[payable("*")]
-    #[endpoint(distributeESDTRewards)]
-    fn distribute_esdt_rewards(&self, mut num_winners: u32) -> OperationCompletionStatus {
-        let payment = self.call_value().single_esdt();
-        let participants = self.participants();
-        let per_user = payment.amount.clone() / num_winners;
-        require!(per_user > 0u32, "Distribute amount cannot be zero");
-        let mut pending_distribution = self.get_current_distribution(EgldOrEsdtTokenIdentifier::esdt(payment.token_identifier.clone()));
-    
-        let run_result = self.run_while_it_has_gas(DEFAULT_MIN_GAS_TO_SAVE_PROGRESS, || {
-            if pending_distribution.current_number == participants.len() {
-                self.cancel_distribution();
-                return STOP_OP;
-            }
-
-            if num_winners == 0 {
-                self.pending_distribution().set(&pending_distribution);
-                return STOP_OP;
-            }
-
-            let addr = participants.get(pending_distribution.current_number + 1);
-            self.send().direct_esdt(&addr, &payment.token_identifier, payment.token_nonce, &per_user);
-            pending_distribution.current_number += 1;
-            num_winners -= 1;
-
-            CONTINUE_OP
-        });
-
-        if run_result == OperationCompletionStatus::InterruptedBeforeOutOfGas {
-            self.pending_distribution().set(&pending_distribution);
-        }
-
-        run_result
-    }
-
-    #[only_owner]
-    #[payable("EGLD")]
     #[endpoint(distributeRewards)]
     fn distribute_rewards(&self, mut num_winners: u32) -> OperationCompletionStatus {
-        let payment_amount = self.call_value().egld_value();
+        let payment = self.call_value().egld_or_single_esdt();
         let participants = self.participants();
-        let per_user = payment_amount / num_winners;
-        require!(per_user > 0u32, "Distribute amount cannot be zero");
-        
-        let mut pending_distribution = self.get_current_distribution(EgldOrEsdtTokenIdentifier::egld());
+        let caller = self.blockchain().get_caller();
+        let mut pending_distribution = self.get_current_distribution(
+            payment.token_identifier.clone(), 
+            payment.amount.clone(),
+            num_winners,
+        );
+        require!(self.participants_left() >= num_winners as usize, "Less participants left than users to distribute");
+        require!(&pending_distribution.per_user * num_winners == payment.amount.clone(), "Invalid value sent");
         let run_result = self.run_while_it_has_gas(DEFAULT_MIN_GAS_TO_SAVE_PROGRESS, || {
             if pending_distribution.current_number == participants.len() {
                 self.cancel_distribution();
@@ -95,8 +65,13 @@ pub trait ExtractWinnersContract: multiversx_sc_modules::ongoing_operation::Ongo
                 self.pending_distribution().set(&pending_distribution);
                 return STOP_OP;
             }
+
             let addr = participants.get(pending_distribution.current_number + 1);
-            self.send().direct_egld(&addr, &per_user);
+            if payment.token_identifier.is_egld() {
+                self.send().direct_egld(&addr, &pending_distribution.per_user);
+            } else {
+                self.send().direct_esdt(&addr, &payment.token_identifier.clone().unwrap_esdt(), payment.token_nonce, &pending_distribution.per_user);
+            }
             pending_distribution.current_number += 1;
             num_winners -= 1;
 
@@ -105,6 +80,11 @@ pub trait ExtractWinnersContract: multiversx_sc_modules::ongoing_operation::Ongo
 
         if run_result == OperationCompletionStatus::InterruptedBeforeOutOfGas {
             self.pending_distribution().set(&pending_distribution);
+            if payment.token_identifier.is_egld() {
+                self.send().direct_egld(&caller, &(&pending_distribution.per_user * num_winners));
+            } else {
+                self.send().direct_esdt(&caller, &payment.token_identifier.clone().unwrap_esdt(), payment.token_nonce, &(&pending_distribution.per_user * num_winners));
+            }
         }
 
         run_result
@@ -116,11 +96,25 @@ pub trait ExtractWinnersContract: multiversx_sc_modules::ongoing_operation::Ongo
         self.pending_distribution().clear();
     }
 
-    fn get_current_distribution(&self, token: EgldOrEsdtTokenIdentifier) -> PendingDistribution<Self::Api> {
+    #[view(participantsLeft)]
+    fn participants_left(&self) -> usize {
+        let participants = self.participants();
         let pending_distribution_mapper = self.pending_distribution();
+        if pending_distribution_mapper.is_empty() {
+            return participants.len()
+        } else {
+            participants.len() - &pending_distribution_mapper.get().current_number
+        }
+    }
+
+    fn get_current_distribution(&self, token: EgldOrEsdtTokenIdentifier, total_amount: BigUint<Self::Api>, num_winners: u32) -> PendingDistribution<Self::Api> {
+        let pending_distribution_mapper = self.pending_distribution();
+        let per_user = total_amount / num_winners;
+        require!(per_user > 0u32, "Distribute amount cannot be zero");
         if pending_distribution_mapper.is_empty() {
             PendingDistribution {
                 payment: token,
+                per_user: per_user,
                 current_number: 0,
             }
         } else {
@@ -131,10 +125,10 @@ pub trait ExtractWinnersContract: multiversx_sc_modules::ongoing_operation::Ongo
     }
 
     #[endpoint(extractWinners)]
-    fn extract_winners(&self, num_winners: u64) -> ManagedVec<ManagedAddress> {
+    fn extract_winners(&self, num_winners: u64) -> MultiValueEncoded<ManagedAddress> {
         let mut rng = RandomnessSource::default();
         let mut participants = self.participants();
-        let mut winners = ManagedVec::new();
+        let mut winners = MultiValueEncoded::new();
         for _ in 0..num_winners {
             let winner_index = rng.next_usize_in_range(0, participants.len());
             let winner = participants.get(winner_index);

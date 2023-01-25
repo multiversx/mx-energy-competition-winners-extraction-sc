@@ -29,6 +29,7 @@ addParticipantsAddresses() {
             ((ADDRESSES_PER_TX=ADDRESSES_PER_TX-1))
 
         else
+            ADDRESSES+=(${address})
             mxpy --verbose contract call ${ADDRESS} --recall-nonce --pem=${ALICE} --gas-limit=300000000 \
             --function="addParticipantsAddresses" --arguments ${ADDRESSES[@]} --send --proxy=${PROXY} --chain=${CHAIN_ID}
             ADDRESSES=()
@@ -48,7 +49,7 @@ extractWinners() {
 
 distributeRewards() {
     mxpy --verbose contract call ${ADDRESS} --recall-nonce --pem=${ALICE} --gas-limit=300000000 \
-    --function="distributeRewards" --value 5000 --arguments 500 --send --proxy=${PROXY} --chain=${CHAIN_ID}     
+    --function="distributeRewards" --value 4200 --arguments 420 --send --proxy=${PROXY} --chain=${CHAIN_ID}     
 }
 
 upgrade() {
