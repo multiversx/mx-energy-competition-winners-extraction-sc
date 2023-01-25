@@ -35,7 +35,7 @@ jobs:
 
       - name: Download build script
         run: |
-          wget https://raw.githubusercontent.com/multiversx/mx-sdk-rust-contract-builder/${{ github.event.inputs.image_tag }}/build_with_docker.py
+          wget https://raw.githubusercontent.com/multiversx/mx-sdk-rust-contract-builder/main/build_with_docker.py
       - name: Build contract
         run: |
           python3 ./build_with_docker.py --no-docker-tty --image=multiversx/sdk-rust-contract-builder:${{ github.event.inputs.image_tag }} --project=. --output=/home/runner/work/output-from-docker
