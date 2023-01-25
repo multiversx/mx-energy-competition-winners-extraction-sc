@@ -17,6 +17,7 @@ on:
         - v3.1.0
         - v4.0.2
         - v4.0.3
+        - next
 
 permissions:
   contents: write
