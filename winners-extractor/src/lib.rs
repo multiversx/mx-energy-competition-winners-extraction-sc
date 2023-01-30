@@ -116,12 +116,13 @@ pub trait ExtractWinnersContract: multiversx_sc_modules::ongoing_operation::Ongo
     fn cancel_distribution(&self) {
         require!(!self.pending_distribution().is_empty(), "No distribution in progress");
         let pending_distribution = self.pending_distribution().get();
-        let participants_left = self.participants().len() - pending_distribution.current_number;
+        let amount_left = self.blockchain().get_sc_balance(&pending_distribution.payment, pending_distribution.payment_nonce);
+        
         self.send().direct(
-            &self.blockchain().get_sc_address(),
+            &self.blockchain().get_caller(),
             &pending_distribution.payment,
             pending_distribution.payment_nonce,
-            &(&pending_distribution.per_user * participants_left as u32),
+            &amount_left,
         );
         self.pending_distribution().clear();
     }
