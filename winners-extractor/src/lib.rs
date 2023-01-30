@@ -111,6 +111,30 @@ pub trait ExtractWinnersContract: multiversx_sc_modules::ongoing_operation::Ongo
         winners
     }
 
+    #[only_owner]
+    #[endpoint(cancelDistribution)]
+    fn cancel_distribution(&self) {
+        require!(!self.pending_distribution().is_empty(), "No distribution in progress");
+        let pending_distribution = self.pending_distribution().get();
+        let amount_left = self.blockchain().get_sc_balance(&pending_distribution.payment, pending_distribution.payment_nonce);
+        
+        self.send().direct(
+            &self.blockchain().get_caller(),
+            &pending_distribution.payment,
+            pending_distribution.payment_nonce,
+            &amount_left,
+        );
+        self.pending_distribution().clear();
+    }
+
+    #[only_owner]
+    #[payable("*")]
+    #[endpoint(distributeRewardsSingle)]
+    fn distribute_rewards_single(&self, receiver: ManagedAddress) {
+        let payment = self.call_value().egld_or_single_esdt();
+        self.send().direct(&receiver, &payment.token_identifier, payment.token_nonce, &payment.amount);
+    }
+
     #[view(participantsLeft)]
     fn participants_left(&self) -> usize {
         let participants = self.participants();
